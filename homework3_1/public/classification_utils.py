@@ -377,7 +377,9 @@ def report(model: dict):
             )
             fig.update_traces(marker={"color": colors, "line": {"width": 0.6}})
             fig.update_layout(yaxis={"dtick": 1}, height=600)
-            fig.show()
+            # fig.show()
+            fig.write_image(f"{type(model['model']).__name__}-feature-importances.png")
+            fig.show(renderer="png")
         else:
             source, args = model["plots"]
             source.plot(**args)
