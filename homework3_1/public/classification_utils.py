@@ -3,6 +3,7 @@ from pprint import pp
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import plotly.express as px
 from IPython.display import display
 from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
@@ -266,6 +267,7 @@ def random_forest(df: pd.DataFrame, target_column: str, opts: dict):
         "title": "A random forest classifier",
         "description": "Случайный лес — это мета-оценщик, который обучает ряд классификаторов на основе деревьев решений на различных подвыборках набора данных и использует усреднение для повышения точности прогнозирования и контроля переобучения",
         "stats": {},
+        "plots": {},
     }
     X, y = df.drop(columns=[target_column]), df[target_column]
     X_train, X_test, y_train, y_test = train_test_split(
@@ -291,10 +293,8 @@ def random_forest(df: pd.DataFrame, target_column: str, opts: dict):
 
     result["stats"]["Матрица ошибок"] = confusion_matrix(y_test, y_pred).tolist()
 
-    # Важность признаков отражаемна круговой диаграмме
-    result["plots"] = {
-        name: float(imp) for name, imp in zip(X.columns, model.feature_importances_)
-    }
+    result["plots"]["feature_importances"] = model.feature_importances_
+    result["plots"]["feature_names"] = X.columns
 
     result["model"] = model
     return result
@@ -306,6 +306,7 @@ def gradient_boosting(df: pd.DataFrame, target_column: str, opts: dict):
         "title": "Gradient Boosted Decision Trees - GBDT",
         "description": "обобщение бустинга до произвольных дифференцируемых функций потерь, что бы это ни значило",
         "stats": {},
+        "plots": {},
     }
     X, y = df.drop(columns=[target_column]), df[target_column]
     X_train, X_test, y_train, y_test = train_test_split(
@@ -329,9 +330,8 @@ def gradient_boosting(df: pd.DataFrame, target_column: str, opts: dict):
         y_test, y_pred, target_names=model.classes_, output_dict=True
     )
 
-    result["plots"] = {
-        name: float(imp) for name, imp in zip(X.columns, model.feature_importances_)
-    }
+    result["plots"]["feature_importances"] = model.feature_importances_
+    result["plots"]["feature_names"] = X.columns
 
     result["model"] = model
     return result
@@ -356,18 +356,28 @@ def report(model: dict):
         elif isinstance(
             model["model"], (RandomForestClassifier, GradientBoostingClassifier)
         ):
-            # Создаем круговую диаграмму
-            plt.pie(
-                model["plots"].values(),
-                # explode=explode,
-                labels=model["plots"].keys(),
-                # colors=colors,
-                # autopct='%1.1f%%',
-                shadow=True,
-                # startangle=140,
+            df = pd.DataFrame(
+                {
+                    "feature": model["plots"]["feature_names"],
+                    "importance": model["plots"]["feature_importances"],
+                }
+            ).sort_values("importance", ascending=True)
+
+            colors = [
+                "green" if sum > 0.1 else "red" for sum in df["importance"].cumsum()
+            ]
+
+            # Строим аналог горизонтальных линий/столбиков
+            fig = px.bar(
+                df,
+                x="importance",
+                y="feature",
+                orientation="h",
+                title="Важность признаков(сумма 'зеленых' = 0,9)",
             )
-            plt.title("Важность признаков")
-            plt.show()
+            fig.update_traces(marker={"color": colors, "line": {"width": 0.6}})
+            fig.update_layout(yaxis={"dtick": 1}, height=600)
+            fig.show()
         else:
             source, args = model["plots"]
             source.plot(**args)
