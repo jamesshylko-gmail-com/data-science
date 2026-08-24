@@ -5,6 +5,7 @@ import pandas as pd
 from colorama import Fore
 from IPython.display import display
 from lightgbm import LGBMClassifier
+from sklearn.calibration import CalibratedClassifierCV
 from sklearn.dummy import DummyClassifier
 from sklearn.ensemble import (
     ExtraTreesClassifier,
@@ -20,10 +21,13 @@ from sklearn.metrics import (
     roc_auc_score,
 )
 from sklearn.model_selection import (
+    cross_val_score,
     train_test_split,
 )
 from sklearn.neighbors import KNeighborsClassifier
+from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
+from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
 from xgboost import XGBClassifier
 
@@ -37,6 +41,7 @@ KNN = "k_nearest_neighbors"
 EXTRA = "extra_trees"
 XGB = "extreme_gradient_boosting"
 LGBM = "light_gradient_boosting_machine"
+SVM = "support_vector_machine"
 
 
 class ClassificationResult:
@@ -100,6 +105,52 @@ def logistic_regression(df: pd.DataFrame, target_column: str, opts: dict):
 
     return ClassificationResult(
         title=opts.get("alter_title", LOG_REG),
+        classes=model.classes_,
+        pr_auc=average_precision_score(y_test, y_prob),
+        roc_auc=roc_auc_score(y_test, y_prob, multi_class="ovr"),
+        accuracy=accuracy_score(y_test, y_pred),
+        classification_report=classification_report(
+            y_test, y_pred, target_names=model.classes_, output_dict=True
+        ),
+        confusion_matrix=confusion_matrix(y_test, y_pred),
+    )
+
+
+@log_time
+def support_vector_machine(df: pd.DataFrame, target_column: str, opts: dict):
+    X, y = df.drop(columns=[target_column]), df[target_column]
+    X_train_val, X_test, y_train_val, y_test = train_test_split(
+        X, y, test_size=opts.get("test_size", 0.2), random_state=42, stratify=y
+    )
+    X_train, X_val, y_train, y_val = train_test_split(
+        X_train_val,
+        y_train_val,
+        test_size=opts.get("test_size", 0.25),
+        random_state=42,
+        stratify=y,
+    )
+
+    base_svc = make_pipeline(
+        StandardScaler(),
+        SVC(
+            kernel="linear",
+            C=1.0,
+            random_state=42,
+            verbose=True,
+        ),
+    )
+    # cv_strategy = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+    model = CalibratedClassifierCV(estimator=base_svc, ensemble=True)
+    scores = cross_val_score(model, X, y, cv=5, scoring="average_precision", n_jobs=-1)
+    for i, score in enumerate(scores):
+        print(f"Блок {i + 1}: {score}")
+
+    model.fit(X_train, y_train)
+    y_pred = model.predict(X_test)
+    y_prob = model.predict_proba(X_test)
+
+    return ClassificationResult(
+        title=opts.get("alter_title", SVM),
         classes=model.classes_,
         pr_auc=average_precision_score(y_test, y_prob),
         roc_auc=roc_auc_score(y_test, y_prob, multi_class="ovr"),

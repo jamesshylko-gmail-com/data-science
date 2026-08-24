@@ -30,6 +30,7 @@ OPT_EXTRA = "Extra Trees"
 OPT_DEC_TR = "Decision Tree"
 OPT_XGB = "Extreme Gradient Boosting"
 OPT_LGBM = "Light Gradient-Boosting Machine"
+OPT_SVM = "Support Vector Machine"
 ALLOWED_MODEL_TYPE = [
     OPT_LOG_REG,
     OPT_RAN_FOR,
@@ -75,7 +76,8 @@ def optimize(
                 class_weight="balanced",
                 max_iter=trial.suggest_int(name="max_iter", low=100, high=200, step=10),
             )
-
+        elif model_type == OPT_SVM:
+            pass
         elif model_type == OPT_RAN_FOR:
             model = RandomForestClassifier(
                 n_estimators=trial.suggest_int(
