@@ -13,8 +13,6 @@ from sklearn.model_selection import (
 )
 from xgboost import XGBRegressor
 
-from public.log_utils import log_time
-
 OPT_RAN_FOR = "Random Forest"
 OPT_XGB_SL = "Extreme Gradient Boosting (sklearn)"
 OPT_XGB = "Extreme Gradient Boosting"
@@ -30,7 +28,7 @@ def optimize(
     n_trials: int = 20,
     max_iter: int = 100,
     # Complete silence (suppresses warnings too)
-    log_level: int = optuna.logging.WARN,
+    log_level: int = optuna.logging.ERROR,
 ) -> optuna.Study:
     optuna.logging.set_verbosity(log_level)
 
@@ -40,7 +38,7 @@ def optimize(
         direction="maximize",
     )
 
-    @log_time
+    # @log_time
     def optuna_optimize(trial):
         if model_type == OPT_RAN_FOR:
             params = {
@@ -104,7 +102,7 @@ def optimize(
                 "l2_leaf_reg": trial.suggest_float("l2_leaf_reg", 1e-3, 10.0, log=True),
                 "loss_function": "RMSE",
                 "eval_metric": "R2",
-                "verbose": 0,
+                "verbose": -1,
             }
             cv_dataset = cb.Pool(data=X, label=y)
             cv_results = cb.cv(

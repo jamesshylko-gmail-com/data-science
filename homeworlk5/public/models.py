@@ -180,7 +180,7 @@ class RegressionProcessor:
         elif name == RAN_FOR:
             return RandomForestRegressor()
         elif name == LGBM:
-            return LGBMRegressor()
+            return LGBMRegressor(verbosity=-1)
         elif name == G_BOOST:
             return GradientBoostingRegressor()
         elif name == XGB:

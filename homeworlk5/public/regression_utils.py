@@ -1,4 +1,5 @@
 import pickle
+import warnings
 
 import optuna
 import pandas as pd
@@ -18,8 +19,6 @@ from sklearn.model_selection import (
     KFold,
     cross_val_predict,
 )
-
-from public.log_utils import log_time
 
 r"""
 - MSE (Mean Squared Error): Средняя квадратичная ошибка. Сильно штрафует за крупные промахи, так как ошибки возводятся в квадрат.
@@ -62,10 +61,11 @@ class ExtendedRegressionResult(RegressionResult):
         )
 
 
-@log_time
+# @log_time
 def regression(
     model, df: pd.DataFrame, target_column: str, title: str, opts: dict
 ) -> RegressionResult:
+    warnings.filterwarnings("ignore")
     if opts:
         model.set_params(**opts)
     X, y = df.drop(columns=[target_column]), df[target_column]
@@ -154,21 +154,12 @@ def optuna_report(studies: list[dict]) -> None:
 
     summary = {}
     for item in studies:
-        print(f'item["title"] : {item["title"]}')
         summary[item["title"]] = {
             "R²": item["study"].best_value,
             "Best params": item["study"].best_params,
         }
     df = pd.DataFrame.from_dict(summary, orient="index")
     display(df)
-    # df["Best params"] = df["Best params"].apply(
-    #     lambda x: (
-    #         json.dumps(x, indent=2, ensure_ascii=False) if isinstance(x, dict) else x
-    #     )
-    # )
-    # display(
-    #     df.style.set_properties(**{"white-space": "pre-wrap", "text-align": "left"})
-    # )
 
 
 def report(df: pd.DataFrame, title: str, model: RegressionResult) -> None:
