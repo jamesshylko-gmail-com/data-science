@@ -68,6 +68,59 @@ def memory_check():
         )
 
 
+def outliers(df: pd.DataFrame, title: str):
+    Q1 = df[title].quantile(0.25)
+    Q3 = df[title].quantile(0.75)
+
+    lower_bound = Q1 - 1.5 * (Q3 - Q1)
+    upper_bound = Q3 + 1.5 * (Q3 - Q1)
+    return df[(df[title] < lower_bound) | (df[title] > upper_bound)]
+
+
+def outliers_plot(
+    df_sourse: pd.DataFrame, title: str, out_indexes: set[int], top: bool
+) -> None:
+    def to_date(x, pos):
+        return date(2021, 1, 11) + timedelta(days=x)
+
+    df = df_sourse.copy()
+    _, ax_main = plt.subplots(figsize=(16, 4), dpi=80)
+    df["color_cond"] = df.index.isin(out_indexes)
+
+    ax = sns.scatterplot(
+        x=df.index,
+        y=title,
+        hue="color_cond",
+        palette={True: "#E67E22", False: "#2B5C8F"},
+        data=df,
+        ax=ax_main,
+    )
+    ymin, ymax = ax.get_ylim()
+    test_border = (df.index.max() - df.index.min()) * 0.8
+    y_position = ymax - (ymax - ymin) * 0.1 if top else ymin + (ymax - ymin) * 0.1
+    ax.axvline(x=test_border, color="gray", linestyle="--", linewidth=1.5)
+    ax.text(
+        test_border + (-280 if top else 20),  # Координата X чуть правее линии
+        y_position,  # Координата Y, где расположится текст (зависит от ваших данных)
+        "train/test border",  # Текст подписи
+        color="#9B2D30",
+        fontsize=14,
+        verticalalignment="center",  # Выравнивание по вертикали
+    )
+
+    handles, _ = ax_main.get_legend_handles_labels()
+    ax_main.legend(title="", handles=handles, labels=["норма", "выбросы"])
+
+    ax.axhline(df[title].mean(), color="blue", linestyle="--", linewidth=2)
+    ax_main.xaxis.set_major_formatter(ticker.FuncFormatter(to_date))
+    ax_main.set(
+        title=f'"{title}" from 2021-01-11 to 2026-01-10', xlabel="", ylabel=title
+    )
+    ax_main.title.set_fontsize(14)
+    ax_main.tick_params(axis="x", rotation=45)
+    plt.show()
+
+
 def feature_plot(df: pd.DataFrame, title: str) -> None:
     def x_k(x, pos):
         if x == 0:
@@ -123,7 +176,7 @@ def feature_importance(X: pd.DataFrame, y: pd.DataFrame) -> None:
     df_importance["color_group"] = [
         "green" if cum <= threshold else "red" for cum in df_importance["cumulative"]
     ]
-    plt.figure(figsize=(12, 6))
+    plt.figure(figsize=(12, 4))
     sns.barplot(
         x="importance",
         y="feature",
@@ -151,7 +204,7 @@ def feature_importance(X: pd.DataFrame, y: pd.DataFrame) -> None:
 
 
 def correlogram(df: pd.DataFrame) -> None:
-    plt.figure(figsize=(16, 10), dpi=80)
+    plt.figure(figsize=(8, 5), dpi=80)
     sns.heatmap(
         df.corr(),
         xticklabels=df.corr().columns,
@@ -159,7 +212,7 @@ def correlogram(df: pd.DataFrame) -> None:
         cmap="RdYlGn",
         center=0,
         annot=True,
-        fmt=".2f",
+        fmt=".4f",
     )
 
     plt.title("Correlogram of mtcars", fontsize=22)

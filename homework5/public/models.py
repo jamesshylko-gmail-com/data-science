@@ -20,7 +20,6 @@ from sklearn.linear_model import (
     Ridge,
     SGDRegressor,
 )
-from sklearn.model_selection import train_test_split
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.tree import DecisionTreeRegressor
 from xgboost import XGBRegressor
@@ -80,9 +79,14 @@ class RegressionProcessor:
         self.models = []
         self.studies = []
         self.best_models = []
+
         X, y = df.drop(columns=[target_column]), df[target_column]
-        X_train, X_test, y_train, y_test = train_test_split(
-            X, y, test_size=0.2, random_state=42
+        split_index = int(len(df) * 0.8)
+        X_train, X_test, y_train, y_test = (
+            X.iloc[:split_index],
+            X.iloc[split_index:],
+            y.iloc[:split_index],
+            y.iloc[split_index:],
         )
         self.train_df = pd.concat([X_train, y_train], axis=1)
         self.test_df = pd.concat([X_test, y_test], axis=1)
@@ -94,15 +98,15 @@ class RegressionProcessor:
         if mode == MODE_DEFAULT:
             for key in algorithm_list:
                 opts = algorithm_list.get(key)
-                self.models.append(
-                    reg.regression(
-                        model=self._get_model(key),
-                        df=self.train_df.copy(),
-                        target_column=self.target_column,
-                        title=key,
-                        opts=opts,
-                    )
+                reg_res = reg.regression(
+                    model=self._get_model(key),
+                    df=self.train_df.copy(),
+                    target_column=self.target_column,
+                    title=key,
+                    opts=opts,
                 )
+                reg_res.is_tuned = False
+                self.models.append(reg_res)
         elif mode == MODE_OPTUNA:
             for key in algorithm_list:
                 self.studies.append(
@@ -120,15 +124,15 @@ class RegressionProcessor:
             for key in algorithm_list:
                 opts = algorithm_list.get(key)
                 opts.update(self._study_by_key(key)["study"].best_params)
-                self.best_models.append(
-                    reg.regression(
-                        model=self._get_model(key),
-                        df=self.train_df.copy(),
-                        target_column=self.target_column,
-                        title=key,
-                        opts=opts,
-                    )
+                reg_res = reg.regression(
+                    model=self._get_model(key),
+                    df=self.train_df.copy(),
+                    target_column=self.target_column,
+                    title=key,
+                    opts=opts,
                 )
+                reg_res.is_tuned = True
+                self.best_models.append(reg_res)
         return self
 
     def _study_by_key(self, key: str) -> Study:
@@ -202,7 +206,7 @@ class RegressionProcessor:
         elif name == HUBER:
             return HuberRegressor(epsilon=100)
         elif name == DEC_TR:
-            return DecisionTreeRegressor(max_depth=15)
+            return DecisionTreeRegressor()
         elif name == OMP:
             return OrthogonalMatchingPursuit(n_nonzero_coefs=5)
         elif name == PASS_AGR:
